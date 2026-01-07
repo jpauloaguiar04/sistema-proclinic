@@ -1,0 +1,6 @@
+@ProClinic.Api_HostAddress = http://localhost:5145
+
+GET {{ProClinic.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

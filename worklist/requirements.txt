@@ -1,0 +1,2 @@
+pynetdicom
+psycopg2-binary

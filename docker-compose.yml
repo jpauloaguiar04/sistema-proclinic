@@ -1,0 +1,87 @@
+version: '3.4'
+
+services:
+  # 1. BANCO DE DADOS
+  proclinic-db:
+    image: postgres:15-alpine
+    container_name: proclinic-db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: senha_segura_123
+      POSTGRES_DB: proclinic_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - proclinic_pgdata:/var/lib/postgresql/data
+    networks:
+      - proclinic-network
+
+  # 2. CACHE (REDIS)
+  proclinic-redis:
+    image: redis/redis-stack:latest
+    container_name: proclinic-redis
+    ports:
+      - "6379:6379"
+      - "8001:8001"
+    networks:
+      - proclinic-network
+
+  # 3. API BACKEND (C#)
+  proclinic-api:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    container_name: proclinic-api
+    volumes:
+      - ./backend:/app
+    working_dir: /app
+    ports:
+      - "5000:8080"
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Host=proclinic-db;Port=5432;Database=proclinic_db;Username=admin;Password=senha_segura_123;
+    command: ["dotnet", "watch", "run"]
+    depends_on:
+      - proclinic-db
+      - proclinic-redis
+    networks:
+      - proclinic-network
+
+  # 4. FRONTEND (REACT)
+  proclinic-frontend:
+    image: node:22-alpine  # <--- ATUALIZADO PARA NODE 22 (Corrige erro do Vite)
+    container_name: proclinic-frontend
+    volumes:
+      - ./frontend:/app
+    working_dir: /app
+    ports:
+      - "3000:5173"  # Porta Externa 3000 -> Interna 5173
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    command: sh -c "npm install && npm run dev -- --host"
+    networks:
+      - proclinic-network
+
+  # 5. WORKLIST (PYTHON DICOM)
+  proclinic-worklist:
+    build: ./worklist
+    container_name: proclinic-worklist
+    ports:
+      - "11112:11112"
+    environment:
+      - DB_HOST=proclinic-db
+      - DB_NAME=proclinic_db
+      - DB_USER=admin
+      - DB_PASS=senha_segura_123
+      - AE_TITLE=PROWORKLIST
+      - PORT=11112
+    depends_on:
+      - proclinic-db
+    networks:
+      - proclinic-network
+
+volumes:
+  proclinic_pgdata:
+
+networks:
+  proclinic-network:
+    external: true

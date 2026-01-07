@@ -1,0 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+body {
+  /* Degradê sutil do topo para baixo: branco para cinza muito claro */
+  @apply bg-gradient-to-b from-slate-50 to-slate-100 text-slate-800 min-h-screen;
+  -webkit-font-smoothing: antialiased;
+}
