@@ -20,3 +20,10 @@ venv/
 postgres_data/
 .redis_data/
 *.log
+
+# Banco de Dados (Ignorar arquivos brutos)
+database/
+postgres_data/
+pgdata/
+*.dat
+*.wal
