@@ -12,8 +12,13 @@ namespace ProClinic.Api.Models
         public string? Email { get; set; }
         public string? Telefone { get; set; }
         public bool Ativo { get; set; } = true;
-        
-        // Campo novo para a imagem da assinatura
         public string? AssinaturaBase64 { get; set; }
+
+        // --- NOVOS CAMPOS ---
+        // Quem pede o exame (aparece no dropdown da Agenda)
+        public bool EhSolicitante { get; set; } = false; 
+
+        // Quem faz o laudo (aparece na tela de Laudos e futuramente terá Login)
+        public bool EhCorpoClinico { get; set; } = true; 
     }
 }

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Calendar, CheckCircle, XCircle, Clock, FileText, DollarSign, Filter, AlertCircle, UserPlus, User, Check, Trash2, Printer, Plus } from 'lucide-react';
+// Importa o Modal que criamos
+import ModalNovoPaciente from '../components/ModalNovoPaciente';
 
 // Aceita a prop de navegação do App.tsx
 export default function Agenda({ onNavigate }: any) {
@@ -7,6 +9,9 @@ export default function Agenda({ onNavigate }: any) {
   const [convenios, setConvenios] = useState<any[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
   const [pacientesCache, setPacientesCache] = useState<any[]>([]);
+  
+  // Estado para armazenar médicos solicitantes
+  const [listaSolicitantes, setListaSolicitantes] = useState<any[]>([]);
 
   // Filtros
   const [agendaSelecionada, setAgendaSelecionada] = useState<string>('');
@@ -17,13 +22,20 @@ export default function Agenda({ onNavigate }: any) {
   // Modais
   const [modalAgendarAberto, setModalAgendarAberto] = useState(false);
   const [modalDetalhesAberto, setModalDetalhesAberto] = useState(false);
+  const [modalPacienteAberto, setModalPacienteAberto] = useState(false); // <--- ESTADO DO MODAL DE PACIENTE
+  
   const [slotFocado, setSlotFocado] = useState('');
   const [agendamentoFocado, setAgendamentoFocado] = useState<any>(null);
   
   // Forms
   const [termoBusca, setTermoBusca] = useState('');
   const [pacienteSelecionado, setPacienteSelecionado] = useState<any>(null);
-  const [formNovo, setFormNovo] = useState({ convenioId: '', servicoId: '' });
+  
+  const [formNovo, setFormNovo] = useState({ 
+    convenioId: '', 
+    servicoId: '', 
+    medicoSolicitanteId: '' 
+  });
 
   const [formConfirmar, setFormConfirmar] = useState({
     numeroCarteirinha: '',
@@ -35,16 +47,21 @@ export default function Agenda({ onNavigate }: any) {
     convenioId: ''
   });
 
-  const API_URL = '/api';
+  const API_URL = '/api'; // Caminho relativo para funcionar com o proxy
 
   useEffect(() => { carregarDadosIniciais(); }, []);
   useEffect(() => { if (agendaSelecionada) carregarSlots(); }, [agendaSelecionada, dataSelecionada]);
 
   const carregarDadosIniciais = async () => {
     try {
-      const [resAgendas, resConv, resServ, resPac] = await Promise.all([
-        fetch(`${API_URL}/Agendas`), fetch(`${API_URL}/Convenios`), fetch(`${API_URL}/Servicos`), fetch(`${API_URL}/Pacientes`)
+      const [resAgendas, resConv, resServ, resPac, resMed] = await Promise.all([
+        fetch(`${API_URL}/Agendas`), 
+        fetch(`${API_URL}/Convenios`), 
+        fetch(`${API_URL}/Servicos`), 
+        fetch(`${API_URL}/Pacientes`),
+        fetch(`${API_URL}/Medicos`)
       ]);
+
       if (resAgendas.ok) {
         const data = await resAgendas.json();
         setAgendas(data);
@@ -53,6 +70,12 @@ export default function Agenda({ onNavigate }: any) {
       if (resConv.ok) setConvenios(await resConv.json());
       if (resServ.ok) setServicos(await resServ.json());
       if (resPac.ok) setPacientesCache(await resPac.json());
+
+      if (resMed.ok) {
+        const todosMedicos = await resMed.json();
+        setListaSolicitantes(todosMedicos.filter((m: any) => m.ehSolicitante === true));
+      }
+
     } catch (e) { console.error(e); }
   };
 
@@ -64,12 +87,27 @@ export default function Agenda({ onNavigate }: any) {
     } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
+  // --- LÓGICA DO NOVO PACIENTE (MODAL) ---
+  const handlePacienteCriado = (novoPaciente: any) => {
+    // 1. Adiciona na lista local (cache) para aparecer nas buscas futuras
+    setPacientesCache((prev) => [...prev, novoPaciente]);
+    
+    // 2. Já seleciona ele automaticamente
+    setPacienteSelecionado(novoPaciente);
+    setTermoBusca(novoPaciente.nome); // Preenche o campo de busca visualmente
+
+    // 3. Se o paciente já tem convênio padrão, tenta selecionar no agendamento também
+    if (novoPaciente.convenioId) {
+        setFormNovo(prev => ({ ...prev, convenioId: novoPaciente.convenioId.toString() }));
+    }
+  };
+
   // --- NOVO AGENDAMENTO ---
   const abrirModalAgendar = (hora: string) => {
     setSlotFocado(hora);
     setTermoBusca('');
     setPacienteSelecionado(null);
-    setFormNovo({ convenioId: '', servicoId: '' });
+    setFormNovo({ convenioId: '', servicoId: '', medicoSolicitanteId: '' });
     setModalAgendarAberto(true);
   };
 
@@ -81,14 +119,17 @@ export default function Agenda({ onNavigate }: any) {
 
   const salvarAgendamento = async () => {
     if (!pacienteSelecionado) return alert("Selecione um paciente");
+    
     const payload = {
       agendaConfigId: parseInt(agendaSelecionada),
       cpfPaciente: pacienteSelecionado.cpf,
       dataHoraInicio: `${dataSelecionada}T${slotFocado}:00`,
       convenioId: formNovo.convenioId ? parseInt(formNovo.convenioId) : null,
       servicoId: formNovo.servicoId ? parseInt(formNovo.servicoId) : null,
+      medicoSolicitanteId: formNovo.medicoSolicitanteId ? parseInt(formNovo.medicoSolicitanteId) : null,
       status: "Agendado"
     };
+
     try {
       const res = await fetch(`${API_URL}/Agendamentos`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
@@ -199,8 +240,15 @@ export default function Agenda({ onNavigate }: any) {
                 <h3 className="font-bold text-lg mb-4">Novo Agendamento ({slotFocado})</h3>
                 <div className="flex gap-2 mb-2">
                     <input autoFocus className="flex-1 border p-2 rounded" placeholder="Buscar Paciente..." value={termoBusca} onChange={e => setTermoBusca(e.target.value)} />
-                    {/* Botão corrigido para usar onNavigate em vez de navigate */}
-                    <button onClick={() => onNavigate('cadastro_pacientes')} className="bg-green-600 text-white p-2 rounded" title="Novo Paciente"><Plus/></button>
+                    
+                    {/* Botão que abre o Modal de Cadastro Rápido */}
+                    <button 
+                        onClick={() => setModalPacienteAberto(true)} 
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white p-2 rounded shadow transition-colors" 
+                        title="Cadastrar Novo Paciente Rápido"
+                    >
+                        <Plus/>
+                    </button>
                 </div>
                 
                 <div className="h-32 overflow-y-auto border rounded mb-4">
@@ -219,10 +267,27 @@ export default function Agenda({ onNavigate }: any) {
                         <option value="">Selecione o Convênio</option>
                         {convenios.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
                     </select>
+                    
                     <select className="w-full border p-2 rounded" value={formNovo.servicoId} onChange={e => setFormNovo({...formNovo, servicoId: e.target.value})}>
                         <option value="">Selecione o Exame</option>
                         {servicos.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                     </select>
+
+                    <div className="relative">
+                        <label className="text-xs font-bold text-slate-500 ml-1 block mb-1">Médico Solicitante (Para Guia)</label>
+                        <select 
+                            className="w-full border p-2 rounded bg-slate-50 focus:bg-white" 
+                            value={formNovo.medicoSolicitanteId} 
+                            onChange={e => setFormNovo({...formNovo, medicoSolicitanteId: e.target.value})}
+                        >
+                            <option value="">Nenhum / Particular</option>
+                            {listaSolicitantes.map(m => (
+                                <option key={m.id} value={m.id}>
+                                    {m.nome} (CRM {m.crm})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <button disabled={!pacienteSelecionado} onClick={salvarAgendamento} className="w-full bg-indigo-600 text-white p-2 rounded font-bold disabled:opacity-50">Confirmar</button>
@@ -283,6 +348,15 @@ export default function Agenda({ onNavigate }: any) {
             </div>
         </div>
       )}
+
+      {/* --- MODAL DE CADASTRO RÁPIDO (COM CONVÊNIOS) --- */}
+      <ModalNovoPaciente 
+        isOpen={modalPacienteAberto}
+        onClose={() => setModalPacienteAberto(false)}
+        onPacienteSalvo={handlePacienteCriado}
+        convenios={convenios} // <--- AQUI ESTÁ A CORREÇÃO IMPORTANTE
+      />
+
     </div>
   );
 }

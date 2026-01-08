@@ -1,239 +1,242 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Trash2, Edit, Save, Search, User, Phone, Calendar, CreditCard, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import { User, Save, Trash2, Search, FileText, Phone, CreditCard, Calendar } from 'lucide-react';
+
+// Caminho relativo para usar o proxy corretamente
+const API_URL = '/api';
 
 export default function Pacientes() {
-  const [pacientes, setPacientes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [termo, setTermo] = useState('');
+  const [pacientes, setPacientes] = useState<any[]>([]);
+  const [convenios, setConvenios] = useState<any[]>([]); // <--- Lista para o Dropdown
+  const [termoBusca, setTermoBusca] = useState('');
   
-  // Modal e Edição
-  const [modalAberto, setModalAberto] = useState(false);
-  const [pacienteEditando, setPacienteEditando] = useState<any>(null);
-
-  // Form State
+  // Estado do formulário
   const [form, setForm] = useState({
+    id: 0,
     nome: '',
     cpf: '',
     dataNascimento: '',
-    sexo: 'M', // Padrão
     telefone: '',
-    convenio: ''
+    email: '',
+    sexo: 'M',
+    convenioId: '' // <--- Armazena o ID do convênio selecionado
   });
 
-  const API_URL = '/api';
-
   useEffect(() => {
-    carregarPacientes();
+    carregarDados();
   }, []);
 
-  const carregarPacientes = async () => {
-    setLoading(true);
+  const carregarDados = async () => {
     try {
-      const res = await fetch(`${API_URL}/Pacientes`);
-      if (res.ok) setPacientes(await res.json());
+      // Busca Pacientes e Convênios simultaneamente
+      const [resPac, resConv] = await Promise.all([
+        axios.get(`${API_URL}/Pacientes`),
+        axios.get(`${API_URL}/Convenios`)
+      ]);
+      
+      setPacientes(resPac.data);
+      setConvenios(resConv.data);
     } catch (error) {
-      console.error("Erro ao carregar:", error);
-    } finally {
-      setLoading(false);
+      console.error("Erro ao carregar dados", error);
     }
-  };
-
-  const abrirModal = (paciente: any = null) => {
-    if (paciente) {
-      setPacienteEditando(paciente);
-      setForm({
-        nome: paciente.nome,
-        cpf: paciente.cpf,
-        // Corta o 'T' da data ISO para o input type="date"
-        dataNascimento: paciente.dataNascimento ? paciente.dataNascimento.split('T')[0] : '',
-        sexo: paciente.sexo || 'M',
-        telefone: paciente.telefone || '',
-        convenio: paciente.convenio || ''
-      });
-    } else {
-      setPacienteEditando(null);
-      setForm({ nome: '', cpf: '', dataNascimento: '', sexo: 'M', telefone: '', convenio: '' });
-    }
-    setModalAberto(true);
   };
 
   const salvar = async () => {
-    if (!form.nome || !form.cpf || !form.dataNascimento) return alert("Preencha os obrigatórios (*)");
+    if (!form.nome || !form.cpf) return alert("Nome e CPF são obrigatórios");
 
+    // Converte o ID para número ou null antes de enviar
     const payload = {
         ...form,
-        // Garante data UTC zerada (00:00:00)
-        dataNascimento: new Date(form.dataNascimento).toISOString()
+        convenioId: form.convenioId ? parseInt(form.convenioId.toString()) : null
     };
 
     try {
-      let res;
-      if (pacienteEditando) {
-        // PUT
-        res = await fetch(`${API_URL}/Pacientes/${pacienteEditando.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: pacienteEditando.id, ...payload })
-        });
+      if (form.id === 0) {
+        // Criar Novo
+        await axios.post(`${API_URL}/Pacientes`, payload);
       } else {
-        // POST
-        res = await fetch(`${API_URL}/Pacientes`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        // Editar Existente
+        await axios.put(`${API_URL}/Pacientes/${form.id}`, payload);
       }
-
-      if (res.ok) {
-        alert("Salvo com sucesso!");
-        setModalAberto(false);
-        carregarPacientes();
-      } else {
-        const erro = await res.text();
-        alert("Erro ao salvar: " + erro);
-      }
+      
+      alert("Paciente salvo com sucesso!");
+      limparForm();
+      carregarDados(); // Atualiza a lista na tela
     } catch (error) {
+      alert("Erro ao salvar. Verifique se o CPF já existe.");
       console.error(error);
     }
   };
 
-  const excluir = async (id: number) => {
-    if (!confirm("Excluir paciente?")) return;
-    await fetch(`${API_URL}/Pacientes/${id}`, { method: 'DELETE' });
-    carregarPacientes();
+  const editar = (p: any) => {
+    // Preenche o formulário com os dados do paciente clicado
+    setForm({
+        id: p.id,
+        nome: p.nome,
+        cpf: p.cpf,
+        dataNascimento: p.dataNascimento ? p.dataNascimento.split('T')[0] : '',
+        telefone: p.telefone || '',
+        email: p.email || '',
+        sexo: p.sexo || 'M',
+        convenioId: p.convenioId || '' // <--- Aqui ele seleciona o convênio no dropdown
+    });
   };
 
-  const filtrados = pacientes.filter((p: any) => 
-    p.nome.toLowerCase().includes(termo.toLowerCase()) || 
-    p.cpf.includes(termo)
+  const excluir = async (id: number) => {
+    if (confirm("Tem certeza que deseja excluir este paciente?")) {
+      try {
+        await axios.delete(`${API_URL}/Pacientes/${id}`);
+        carregarDados();
+      } catch (error) {
+        alert("Erro ao excluir. O paciente pode ter agendamentos vinculados.");
+      }
+    }
+  };
+
+  const limparForm = () => {
+    setForm({ id: 0, nome: '', cpf: '', dataNascimento: '', telefone: '', email: '', sexo: 'M', convenioId: '' });
+  };
+
+  // Filtro de busca local
+  const pacientesFiltrados = pacientes.filter(p => 
+    p.nome.toLowerCase().includes(termoBusca.toLowerCase()) || 
+    p.cpf.includes(termoBusca)
   );
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <User className="text-emerald-600" /> Pacientes
-        </h1>
-        <button onClick={() => abrirModal()} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-emerald-700">
-          <Plus size={20} /> Novo Paciente
-        </button>
-      </div>
+    <div className="p-8 h-full bg-slate-50 animate-fade-in overflow-auto">
+      <h1 className="text-3xl font-light text-slate-800 mb-8 flex items-center">
+        <User className="mr-3 text-indigo-600" size={32} /> Cadastro de Pacientes
+      </h1>
 
-      {/* BARRA DE BUSCA */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex gap-2">
-        <div className="relative flex-1">
-            <Search className="absolute left-3 top-3 text-slate-400" size={18} />
-            <input 
-                className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
-                placeholder="Buscar por Nome ou CPF..."
-                value={termo}
-                onChange={e => setTermo(e.target.value)}
-            />
-        </div>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        
+        {/* --- FORMULÁRIO (Coluna da Esquerda) --- */}
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-fit sticky top-4">
+          <h2 className="font-bold text-lg mb-4 text-slate-700 flex justify-between">
+            {form.id === 0 ? 'Novo Paciente' : 'Editando Paciente'}
+            {form.id !== 0 && <button onClick={limparForm} className="text-xs text-indigo-600 underline">Cancelar Edição</button>}
+          </h2>
+          
+          <div className="space-y-4">
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nome Completo</label>
+                <input className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                       value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
+            </div>
 
-      {/* TABELA */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="p-4 text-sm font-bold text-slate-600">Nome</th>
-              <th className="p-4 text-sm font-bold text-slate-600">CPF</th>
-              <th className="p-4 text-sm font-bold text-slate-600">Nascimento</th>
-              <th className="p-4 text-sm font-bold text-slate-600">Sexo</th>
-              <th className="p-4 text-sm font-bold text-slate-600">Convênio</th>
-              <th className="p-4 text-sm font-bold text-slate-600 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && <tr><td colSpan={6} className="p-8 text-center text-slate-400">Carregando...</td></tr>}
-            
-            {!loading && filtrados.map((p: any) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="p-4 font-bold text-slate-800">{p.nome}</td>
-                <td className="p-4 text-slate-600 font-mono text-xs">{p.cpf}</td>
-                <td className="p-4 text-slate-600 text-sm">
-                    {new Date(p.dataNascimento).toLocaleDateString('pt-BR')}
-                </td>
-                <td className="p-4 text-slate-600 text-sm">
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                        p.sexo === 'M' ? 'bg-blue-100 text-blue-700' :
-                        p.sexo === 'F' ? 'bg-pink-100 text-pink-700' : 'bg-gray-100 text-gray-700'
-                    }`}>
-                        {p.sexo === 'M' ? 'MASC' : p.sexo === 'F' ? 'FEM' : 'OUTRO'}
-                    </span>
-                </td>
-                <td className="p-4 text-slate-600 text-sm">{p.convenio || '-'}</td>
-                <td className="p-4 text-right flex justify-end gap-2">
-                  <button onClick={() => abrirModal(p)} className="text-indigo-600 hover:bg-indigo-50 p-2 rounded"><Edit size={18}/></button>
-                  <button onClick={() => excluir(p.id)} className="text-red-500 hover:bg-red-50 p-2 rounded"><Trash2 size={18}/></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* MODAL FORMULÁRIO */}
-      {modalAberto && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="bg-emerald-600 text-white p-4 flex justify-between items-center">
-                    <h3 className="font-bold flex items-center gap-2"><User size={20}/> {pacienteEditando ? 'Editar' : 'Novo'} Paciente</h3>
-                    <button onClick={() => setModalAberto(false)}><X/></button>
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">CPF</label>
+                    <input className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                           value={form.cpf} onChange={e => setForm({...form, cpf: e.target.value})} maxLength={14} placeholder="000.000.000-00"/>
                 </div>
-                
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Nome Completo *</label>
-                        <input className="w-full p-2 border rounded" value={form.nome} onChange={e => setForm({...form, nome: e.target.value})} />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">CPF *</label>
-                            <input className="w-full p-2 border rounded" placeholder="000.000.000-00" value={form.cpf} onChange={e => setForm({...form, cpf: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Nascimento *</label>
-                            <input type="date" className="w-full p-2 border rounded" value={form.dataNascimento} onChange={e => setForm({...form, dataNascimento: e.target.value})} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Sexo *</label>
-                            <select className="w-full p-2 border rounded bg-white" value={form.sexo} onChange={e => setForm({...form, sexo: e.target.value})}>
-                                <option value="M">Masculino</option>
-                                <option value="F">Feminino</option>
-                                <option value="O">Outro</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">Telefone</label>
-                            <div className="relative">
-                                <Phone size={14} className="absolute left-2.5 top-3 text-slate-400"/>
-                                <input className="w-full pl-8 p-2 border rounded" value={form.telefone} onChange={e => setForm({...form, telefone: e.target.value})} />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">Convênio Padrão</label>
-                        <div className="relative">
-                            <CreditCard size={14} className="absolute left-2.5 top-3 text-slate-400"/>
-                            <input className="w-full pl-8 p-2 border rounded" placeholder="Ex: Unimed, Particular..." value={form.convenio} onChange={e => setForm({...form, convenio: e.target.value})} />
-                        </div>
-                    </div>
-                </div>
-
-                <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
-                    <button onClick={() => setModalAberto(false)} className="px-4 py-2 text-slate-500 hover:bg-slate-200 rounded">Cancelar</button>
-                    <button onClick={salvar} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded shadow hover:bg-emerald-700">Salvar</button>
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Nascimento</label>
+                    <input type="date" className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                           value={form.dataNascimento} onChange={e => setForm({...form, dataNascimento: e.target.value})} />
                 </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Telefone</label>
+                    <input className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none" 
+                           value={form.telefone} onChange={e => setForm({...form, telefone: e.target.value})} />
+                </div>
+                <div>
+                    <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Sexo</label>
+                    <select className="w-full p-2 border border-slate-300 rounded bg-white" value={form.sexo} onChange={e => setForm({...form, sexo: e.target.value})}>
+                        <option value="M">Masculino</option>
+                        <option value="F">Feminino</option>
+                    </select>
+                </div>
+            </div>
+
+            {/* --- SELEÇÃO DE CONVÊNIO --- */}
+            <div>
+                <label className="text-xs font-bold text-slate-500 uppercase block mb-1">Convênio Padrão</label>
+                <div className="relative">
+                    <CreditCard size={16} className="absolute left-3 top-3 text-slate-400"/>
+                    <select 
+                        className="w-full pl-9 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                        value={form.convenioId} onChange={e => setForm({...form, convenioId: e.target.value})}
+                    >
+                        <option value="">Particular / Sem Convênio</option>
+                        {convenios.map(c => (
+                            <option key={c.id} value={c.id}>{c.nome}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
+            <button onClick={salvar} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow hover:bg-indigo-700 flex justify-center items-center transition-all">
+              <Save size={18} className="mr-2"/> Salvar Paciente
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* --- LISTA DE PACIENTES (Coluna da Direita) --- */}
+        <div className="col-span-2">
+            <div className="mb-4 relative">
+                <Search className="absolute left-3 top-3 text-slate-400" size={20}/>
+                <input 
+                    className="w-full pl-10 p-3 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Buscar por nome ou CPF..."
+                    value={termoBusca}
+                    onChange={e => setTermoBusca(e.target.value)}
+                />
+            </div>
+
+            <div className="space-y-3">
+                {pacientesFiltrados.map(p => {
+                    // Descobre o nome do convênio pelo ID para mostrar no card
+                    const nomeConvenio = convenios.find(c => c.id === p.convenioId)?.nome || 'Particular';
+
+                    return (
+                        <div key={p.id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center hover:shadow-md transition-shadow group">
+                            <div>
+                                <div className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                                    {p.nome}
+                                    <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded border border-indigo-100 font-mono">
+                                        {p.sexo === 'M' ? 'MASC' : 'FEM'}
+                                    </span>
+                                </div>
+                                <div className="text-slate-500 text-sm flex gap-4 mt-1">
+                                    <span className="flex items-center gap-1"><FileText size={14}/> {p.cpf}</span>
+                                    <span className="flex items-center gap-1"><Phone size={14}/> {p.telefone || '-'}</span>
+                                    
+                                    {/* Exibe o convênio no card */}
+                                    <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                                        <CreditCard size={14}/> {nomeConvenio}
+                                    </span>
+                                </div>
+                                <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                                    <Calendar size={12}/> Nasc: {p.dataNascimento ? new Date(p.dataNascimento).toLocaleDateString('pt-BR') : '-'}
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => editar(p)} className="px-3 py-1 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded text-sm font-bold">
+                                    Editar
+                                </button>
+                                <button onClick={() => excluir(p.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                                    <Trash2 size={18}/>
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+                
+                {pacientesFiltrados.length === 0 && (
+                    <div className="text-center py-10 text-slate-400">
+                        Nenhum paciente encontrado.
+                    </div>
+                )}
+            </div>
+        </div>
+
+      </div>
     </div>
   );
 }

@@ -26,14 +26,13 @@ namespace ProClinic.Api.Data
         public DbSet<FraseLaudo> FrasesLaudo { get; set; }
         public DbSet<Equipamento> Equipamentos { get; set; }
         public DbSet<GuiaTiss> GuiasTiss { get; set; }
-        
-        // --- Adicionado para Faturamento ---
         public DbSet<GuiaTissDespesa> GuiasTissDespesas { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
             
+            // Configuração existente de Grupos/Permissões
             modelBuilder.Entity<GrupoUsuario>()
                 .HasMany(g => g.Permissoes)
                 .WithMany(p => p.Grupos)
@@ -41,6 +40,19 @@ namespace ProClinic.Api.Data
                     j => j.HasOne(gp => gp.Permissao).WithMany().HasForeignKey(gp => gp.PermissoesId),
                     j => j.HasOne(gp => gp.Grupo).WithMany().HasForeignKey(gp => gp.GruposId),
                     j => { j.HasKey(t => new { t.GruposId, t.PermissoesId }); });
+
+            // --- CORREÇÃO DO ERRO ---
+            // Define que o campo CPF é único (para servir de chave)
+            modelBuilder.Entity<Paciente>()
+                .HasIndex(p => p.CPF)
+                .IsUnique();
+
+            // Ensina ao EF que Agendamento se liga ao Paciente pelo CPF, não pelo Id
+            modelBuilder.Entity<Agendamento>()
+                .HasOne(a => a.Paciente)
+                .WithMany()
+                .HasForeignKey(a => a.CpfPaciente)
+                .HasPrincipalKey(p => p.CPF); // <--- O PULO DO GATO
         }
     }
 }

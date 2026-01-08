@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ProClinic.Api.Data;
@@ -11,9 +12,11 @@ using ProClinic.Api.Data;
 namespace ProClinic.Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260108135532_AdicionarColunaMedicoSolicitante")]
+    partial class AdicionarColunaMedicoSolicitante
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -599,15 +602,12 @@ namespace ProClinic.Api.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("Ativo")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("CPF")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("ConvenioId")
-                        .HasColumnType("integer");
+                    b.Property<string>("Convenio")
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("DataCadastro")
                         .HasColumnType("timestamp without time zone");
@@ -615,14 +615,12 @@ namespace ProClinic.Api.Data.Migrations
                     b.Property<DateTime>("DataNascimento")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
                     b.Property<string>("Nome")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Sexo")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Telefone")
@@ -632,8 +630,6 @@ namespace ProClinic.Api.Data.Migrations
 
                     b.HasIndex("CPF")
                         .IsUnique();
-
-                    b.HasIndex("ConvenioId");
 
                     b.ToTable("Pacientes");
                 });
@@ -896,15 +892,6 @@ namespace ProClinic.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("GuiaTiss");
-                });
-
-            modelBuilder.Entity("ProClinic.Api.Models.Paciente", b =>
-                {
-                    b.HasOne("ProClinic.Api.Models.Convenio", "Convenio")
-                        .WithMany()
-                        .HasForeignKey("ConvenioId");
-
-                    b.Navigation("Convenio");
                 });
 
             modelBuilder.Entity("ProClinic.Api.Models.Usuario", b =>

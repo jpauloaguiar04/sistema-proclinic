@@ -1,26 +1,27 @@
+using System;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProClinic.Api.Models
 {
     public class Paciente
     {
-        [Key]
         public int Id { get; set; }
-
-        [Required]
-        public string Nome { get; set; } = string.Empty;
-
-        [Required]
-        public string CPF { get; set; } = string.Empty;
-
-        public DateTime DataNascimento { get; set; }
-
-        // --- NOVO CAMPO ---
-        public string Sexo { get; set; } = "O"; // M=Masculino, F=Feminino, O=Outro
-
-        public string? Telefone { get; set; }
-        public string? Convenio { get; set; } // Texto livre ou ID de convênio
+        public string Nome { get; set; }
         
-        public DateTime DataCadastro { get; set; } = DateTime.UtcNow;
+        // VOLTAMOS PARA MAIÚSCULO PARA AGRADAR O RESTO DO SISTEMA
+        public string CPF { get; set; } 
+        
+        public DateTime DataNascimento { get; set; }
+        public string? Telefone { get; set; }
+        public string? Email { get; set; }
+        public string? Sexo { get; set; }
+        public DateTime DataCadastro { get; set; }
+        public bool Ativo { get; set; }
+
+        public int? ConvenioId { get; set; }
+        
+        [ForeignKey("ConvenioId")]
+        public Convenio? Convenio { get; set; }
     }
 }

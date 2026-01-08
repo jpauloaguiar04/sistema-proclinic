@@ -30,13 +30,11 @@ namespace ProClinic.Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Paciente>> PostPaciente(Paciente paciente)
         {
-            // CORREÇÃO DE DATA (UTC) PARA O POSTGRES
             if (paciente.DataNascimento.Kind == DateTimeKind.Unspecified)
                 paciente.DataNascimento = DateTime.SpecifyKind(paciente.DataNascimento, DateTimeKind.Utc);
             else
                 paciente.DataNascimento = paciente.DataNascimento.ToUniversalTime();
 
-            // Garante data de cadastro
             paciente.DataCadastro = DateTime.UtcNow;
 
             _context.Pacientes.Add(paciente);
@@ -61,13 +59,21 @@ namespace ProClinic.Api.Controllers
         {
             if (id != paciente.Id) return BadRequest();
 
-            // CORREÇÃO DE DATA (UTC) NA EDIÇÃO TAMBÉM
-            if (paciente.DataNascimento.Kind == DateTimeKind.Unspecified)
-                paciente.DataNascimento = DateTime.SpecifyKind(paciente.DataNascimento, DateTimeKind.Utc);
-            else
-                paciente.DataNascimento = paciente.DataNascimento.ToUniversalTime();
+            var pacienteExistente = await _context.Pacientes.FindAsync(id);
+            if (pacienteExistente == null) return NotFound();
 
-            _context.Entry(paciente).State = EntityState.Modified;
+            pacienteExistente.Nome = paciente.Nome;
+            // Padronizado CPF Maiúsculo
+            pacienteExistente.CPF = paciente.CPF;
+            pacienteExistente.Telefone = paciente.Telefone;
+            pacienteExistente.Email = paciente.Email;
+            pacienteExistente.Sexo = paciente.Sexo;
+            pacienteExistente.ConvenioId = paciente.ConvenioId;
+
+            if (paciente.DataNascimento.Kind == DateTimeKind.Unspecified)
+                pacienteExistente.DataNascimento = DateTime.SpecifyKind(paciente.DataNascimento, DateTimeKind.Utc);
+            else
+                pacienteExistente.DataNascimento = paciente.DataNascimento.ToUniversalTime();
 
             try
             {
@@ -76,7 +82,7 @@ namespace ProClinic.Api.Controllers
             catch (DbUpdateConcurrencyException)
             {
                 if (!await _context.Pacientes.AnyAsync(e => e.Id == id)) return NotFound();
-                throw;
+                else throw;
             }
 
             return NoContent();
@@ -87,6 +93,7 @@ namespace ProClinic.Api.Controllers
         {
             var paciente = await _context.Pacientes.FindAsync(id);
             if (paciente == null) return NotFound();
+            
             _context.Pacientes.Remove(paciente);
             await _context.SaveChangesAsync();
             return NoContent();

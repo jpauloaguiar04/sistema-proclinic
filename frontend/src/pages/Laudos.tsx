@@ -220,7 +220,18 @@ export default function Laudos() {
                                             {mascarasLista.map(m => <option key={m.id} value={m.id}>{m.titulo}</option>)}
                                         </select>
                                         <div className="h-6 w-px bg-slate-200 mx-1"></div>
-                                        <select className="text-xs border p-1 rounded w-32" value={medicoAssinanteId} onChange={e => setMedicoAssinanteId(e.target.value)}><option value="">Assinar como...</option>{medicos.map(m => <option key={m.id} value={m.id}>{m.nome}</option>)}</select>
+                                        
+                                        {/* AQUI ESTÁ A CORREÇÃO: Filtrando só quem é Corpo Clínico */}
+                                        <select className="text-xs border p-1 rounded w-32" value={medicoAssinanteId} onChange={e => setMedicoAssinanteId(e.target.value)}>
+                                            <option value="">Assinar como...</option>
+                                            {medicos
+                                                .filter(m => m.ehCorpoClinico === true) // Filtro para mostrar apenas médicos Laudantes
+                                                .map(m => (
+                                                    <option key={m.id} value={m.id}>{m.nome}</option>
+                                                ))
+                                            }
+                                        </select>
+
                                         <button onClick={() => salvarLaudo('SALVAR')} className="px-3 py-1 text-xs border rounded font-bold hover:bg-slate-50">Salvar</button>
                                         <button onClick={() => salvarLaudo('ASSINAR')} className="px-3 py-1 bg-emerald-600 text-white text-xs rounded font-bold hover:bg-emerald-700">Assinar</button>
                                     </>

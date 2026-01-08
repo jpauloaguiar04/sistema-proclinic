@@ -15,6 +15,11 @@ namespace ProClinic.Api.Models
 
         [Required]
         public string CpfPaciente { get; set; } = string.Empty; 
+        
+        // --- CORREÇÃO: Propriedade de Navegação Adicionada ---
+        // Permite usar .Include(a => a.Paciente) no Controller
+        [ForeignKey("CpfPaciente")]
+        public Paciente? Paciente { get; set; }
 
         public DateTime DataHoraInicio { get; set; }
         public DateTime DataHoraFim { get; set; }
@@ -30,6 +35,12 @@ namespace ProClinic.Api.Models
         public int? ServicoId { get; set; }
         [ForeignKey("ServicoId")]
         public Servico? Servico { get; set; }
+        
+        // --- NOVO RELACIONAMENTO (Solicitante) ---
+        // Se você implementou a funcionalidade anterior, mantenha isso:
+        public int? MedicoSolicitanteId { get; set; }
+        [ForeignKey("MedicoSolicitanteId")]
+        public Medico? MedicoSolicitante { get; set; }
 
         // --- TISS/FINANCEIRO ---
         public string? NumeroCarteirinha { get; set; }
@@ -49,7 +60,7 @@ namespace ProClinic.Api.Models
         [ForeignKey("MedicoLaudoId")]
         public Medico? MedicoLaudo { get; set; }
 
-        // --- LOTE TISS (NOVO) ---
+        // --- LOTE TISS ---
         public int? LoteTissId { get; set; }
         [ForeignKey("LoteTissId")]
         public LoteTiss? LoteTiss { get; set; }
